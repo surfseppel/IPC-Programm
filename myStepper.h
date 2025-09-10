@@ -21,12 +21,8 @@ void initStepper(void);
 double getPosition(void);
 //Aktuelle Position des Motors auf einen neuen Wert setzen
 void setPosition(double position);
-//StallGuard Konfiguration
-void initStallGuard(void);
-//Referenzfahrt: Testen der Endlagen und Ausrichten des Wagens
-void referenceIPC(void); 
-// automatische Einstellung der StallGuard
-void autoTuneStallGuard(void); 
+//Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
+void goAbsolute(double position, double vel, double acc);
 //Setzen der Richtung
 void writeDirection(bool direction);
 //Setzen der Geschwindikeit im VMAX Register  
@@ -51,5 +47,15 @@ void enableMotor();
 double getSetVelocity();
 //Rückgabe der aktuellen Sollbeschleunigung (nicht Istbeschleunigung)
 double getSetAcceleration();
+
+//----------------------
+//noch nicht geschrieben
+//----------------------
+//StallGuard Konfiguration
+void initStallGuard(void);
+//Referenzfahrt: Testen der Endlagen und Ausrichten des Wagens
+void referenceIPC(void); 
+// automatische Einstellung der StallGuard
+void autoTuneStallGuard(void); 
 
 #endif // _MY_STEPPER_H_ 

@@ -23,7 +23,7 @@ void initStepper(void) {
   pinMode(CSPIN, OUTPUT);
 
   //SPI starten, 5 MHz, MSB first, Mode 3 (TMC5160 erwartet Mode 3)
-	driver.setSPISpeed(TMC5160_SPI_CLK); 
+  driver.setSPISpeed(TMC5160_SPI_CLK); 
   SPI.begin();
 
   //??? Setzen der Clock für den TMC5160Stepper
@@ -100,6 +100,87 @@ void setPosition(double position) {
   driver.XACTUAL((int32_t)(position / output_scaling));  // Setzt die aktuelle Position im XACTUAL Register
 }
 
+//Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
+void goAbsolute(double position, double vel, double acc){
+	if (motorDisable){
+		if (DEBUG) {
+			Serial.println("motor disable");			
+		}
+		return;
+	}
+	if (!REFERENCED){
+		if (DEBUG) {
+			Serial.println("plant not referenced");		
+		}
+		return;
+	}
+	uint64_t actTime = millis();
+	uint32_t xactual = driver.XACTUAL();  //aktuelle Position
+    uint32_t xtarget = position/output_scaling; // Zielposition umwandeln in Inkremente
+	
+	//Geschwindigkeitsberechnung
+	double abs_vel = abs(vel);  //Betrag bestimmen
+	//Begrenzung der Geschwindigkeit zwischen 0 und max. Geschwindigkeit
+	if (abs_vel > MAX_VEL) { abs_vel = MAX_VEL; }  //obere Begrenzung auf max. Geschwindigkeit
+	abs_vel = abs_vel * (abs_vel > 0.00009);       // untere Begrenzung, ab wann 0 sein soll
+
+	//Berechnung des VMAX Parameters im Motortreibers
+	double vel_ustep = (abs_vel * MOTOR_STEPS * U_STEPS) / PULLEY_CIRCUM;  //  v in µsteps/s
+	uint32_t VMAX_setting = (vel_ustep * pow(2, 24)) / F_CLK;              //VMAX Parameter
+	if (VMAX_setting > 0x7FFE00) { VMAX_setting = 0x7FFE00; }              //VMAX auf Register Maximum begrenzen (2^23)-512
+	driver.VMAX(VMAX_setting);                                             //Parameter schreiben
+	driver.v1(VMAX_setting);    
+	//aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
+	absVelocitySet = abs_vel;   
+	if (DEBUG) {
+		Serial.print("vel: ");
+		Serial.print(abs_vel);
+		Serial.print("   ");
+		Serial.println(VMAX_setting);
+	}	
+	
+	//Beschleunigungsberechnung
+	double abs_acc = abs(acceleration);  //Betrag bestimmen
+	//Begrenzung der Beschleunigung zwischen 0 und max. Beschleunigung
+	if (abs_acc > MAX_ACC) { abs_acc = MAX_ACC; }  //obere Begrenzung auf max. Beschleunigung
+	abs_acc = abs_acc * (abs_acc > 0.001);         //untere Begrenzung, ab wann 0 sein soll
+
+	//Berechnung des AMAX Parameters im Motortreiber
+	double acc_ustep = (abs_acc * MOTOR_STEPS * U_STEPS) / PULLEY_CIRCUM;                //a in µsteps/s²
+	uint32_t AMAX_setting = (acc_ustep * pow(2, 41)) / ((double)F_CLK * (double)F_CLK);  //AMAX Parameter
+	if (AMAX_setting > 0xFFFF) { AMAX_setting = 0xFFFF; }                                //AMAX auf Register Maximum begrenzen  0…(2^16)-1
+	
+	driver.AMAX(AMAX_setting);   //im Positionierungsmodus müssen alle Rampenparameter geschrieben werden,	
+	driver.DMAX(AMAX_setting); 															 	
+	driver.a1(AMAX_setting);  															      
+	driver.d1(AMAX_setting); 
+	driver.VSTART(0);       
+	driver.VSTOP(10);       
+	driver.TZEROWAIT(0);  
+	driver.RAMPMODE(0);			//Setzen des Positionierungsmodus
+	driver.XTARGET() = xtarget;
+	//aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
+	absAccelerationSet = abs_acc;
+	if (DEBUG) {
+		Serial.print("acc: ");
+		Serial.print(abs_acc);
+		Serial.print("   ");
+		Serial.println(AMAX_setting);
+	}
+	//warten bis Zielposition erreicht
+	while(xactual != xtarget){
+		delay(1);	//???					
+		xactual = driver.XACTUAL();  //aktuelle Position
+		if (actTime + 20000 < millis()) { //20 sek warten
+			if (DEBUG) {
+				Serial.println("Can not reach position");
+			}
+			break;
+		}
+	}
+	driver.RAMPMODE(1);				//Zurücksetzen auf Geschwindigkeitsmodus
+}
+
 //StallGuard Konfiguration
 void initStallGuard(void) {
   //stallGuard aktivieren
@@ -143,7 +224,7 @@ void autoTuneStallGuard(void) {
    */
 }
 void writeDirection(bool direction) {
-  // 1 ist positiev, 0 ist negative Richtung
+  // 1 ist positiv, 0 ist negative Richtung
 
   if (DEBUG) {
     Serial.print("setting dir: ");
