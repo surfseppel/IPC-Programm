@@ -3,13 +3,14 @@
 #include "myStepper.h"
 
 //Globale Varialben
-TMC5160Stepper driver(CSPIN, 0.075);  //Hardware SPI, RMS Strom 3,11A 
+TMC5160Stepper driver(CSPIN, 0.075);  	//Hardware SPI, RMS Strom 3,11A 
 bool motorDisable = true;       		//Motortreiber deaktiviert
 bool motorDirection = true;     		//Motorrichtung true=Rechtslauf, false=Linkslauf
 double absVelocitySet = 0;      		//Betrag der aktuell gesetzten Geschwindigkeit (muss noch nicht erreicht sein)
 double absAccelerationSet = 0;  		//Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
 double output_scaling = CART_SCALING; 	//Weg in m
 uint8_t rampModeSetting = 1;    		//1=Rechtslauf, 2=Linkslauf
+uint8_t referenced = 0;					//0 Anlage nicht referenziert/1 Anlage referenziert 
 
 //Einstellung des Motortreibers
 void initStepper(void) {
@@ -178,6 +179,8 @@ void goAbsolute(double position, double vel, double acc){
 			break;
 		}
 	}
+	driver.AMAX(0);
+	driver.VMAX(0);
 	driver.RAMPMODE(1);				//Zurücksetzen auf Geschwindigkeitsmodus
 }
 
