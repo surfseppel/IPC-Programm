@@ -10,7 +10,7 @@ double absVelocitySet = 0;      		//Betrag der aktuell gesetzten Geschwindigkeit
 double absAccelerationSet = 0;  		//Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
 double output_scaling = CART_SCALING; 	//Weg in m
 uint8_t rampModeSetting = 1;    		//1=Rechtslauf, 2=Linkslauf
-uint8_t referenced = 0;					//0 Anlage nicht referenziert/1 Anlage referenziert 
+uint8_t referenced = 1;					//??? 0 Anlage nicht referenziert/1 Anlage referenziert 
 
 //Einstellung des Motortreibers
 void initStepper(void) {
@@ -109,79 +109,19 @@ void goAbsolute(double position, double vel, double acc){
 		}
 		return;
 	}
-	if (!REFERENCED){
+	if (!referenced){
 		if (DEBUG) {
 			Serial.println("plant not referenced");		
 		}
 		return;
 	}
-	uint64_t actTime = millis();
-	uint32_t xactual = driver.XACTUAL();  //aktuelle Position
-    uint32_t xtarget = position/output_scaling; // Zielposition umwandeln in Inkremente
-	
-	//Geschwindigkeitsberechnung
-	double abs_vel = abs(vel);  //Betrag bestimmen
-	//Begrenzung der Geschwindigkeit zwischen 0 und max. Geschwindigkeit
-	if (abs_vel > MAX_VEL) { abs_vel = MAX_VEL; }  //obere Begrenzung auf max. Geschwindigkeit
-	abs_vel = abs_vel * (abs_vel > 0.00009);       // untere Begrenzung, ab wann 0 sein soll
-
-	//Berechnung des VMAX Parameters im Motortreibers
-	double vel_ustep = (abs_vel * MOTOR_STEPS * U_STEPS) / PULLEY_CIRCUM;  //  v in µsteps/s
-	uint32_t VMAX_setting = (vel_ustep * pow(2, 24)) / F_CLK;              //VMAX Parameter
-	if (VMAX_setting > 0x7FFE00) { VMAX_setting = 0x7FFE00; }              //VMAX auf Register Maximum begrenzen (2^23)-512
-	driver.VMAX(VMAX_setting);                                             //Parameter schreiben
-	driver.v1(VMAX_setting);    
-	//aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
-	absVelocitySet = abs_vel;   
-	if (DEBUG) {
-		Serial.print("vel: ");
-		Serial.print(abs_vel);
-		Serial.print("   ");
-		Serial.println(VMAX_setting);
-	}	
-	
-	//Beschleunigungsberechnung
-	double abs_acc = abs(acceleration);  //Betrag bestimmen
-	//Begrenzung der Beschleunigung zwischen 0 und max. Beschleunigung
-	if (abs_acc > MAX_ACC) { abs_acc = MAX_ACC; }  //obere Begrenzung auf max. Beschleunigung
-	abs_acc = abs_acc * (abs_acc > 0.001);         //untere Begrenzung, ab wann 0 sein soll
-
-	//Berechnung des AMAX Parameters im Motortreiber
-	double acc_ustep = (abs_acc * MOTOR_STEPS * U_STEPS) / PULLEY_CIRCUM;                //a in µsteps/s²
-	uint32_t AMAX_setting = (acc_ustep * pow(2, 41)) / ((double)F_CLK * (double)F_CLK);  //AMAX Parameter
-	if (AMAX_setting > 0xFFFF) { AMAX_setting = 0xFFFF; }                                //AMAX auf Register Maximum begrenzen  0…(2^16)-1
-	
-	driver.AMAX(AMAX_setting);   //im Positionierungsmodus müssen alle Rampenparameter geschrieben werden,	
-	driver.DMAX(AMAX_setting); 															 	
-	driver.a1(AMAX_setting);  															      
-	driver.d1(AMAX_setting); 
+ 	writeVelocity(vel);
+	writeAcceleration(acc);
 	driver.VSTART(0);       
 	driver.VSTOP(10);       
 	driver.TZEROWAIT(0);  
-	driver.RAMPMODE(0);			//Setzen des Positionierungsmodus
-	driver.XTARGET() = xtarget;
-	//aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
-	absAccelerationSet = abs_acc;
-	if (DEBUG) {
-		Serial.print("acc: ");
-		Serial.print(abs_acc);
-		Serial.print("   ");
-		Serial.println(AMAX_setting);
-	}
-	//warten bis Zielposition erreicht
-	while(xactual != xtarget){
-		delay(1);	//???					
-		xactual = driver.XACTUAL();  //aktuelle Position
-		if (actTime + 20000 < millis()) { //20 sek warten
-			if (DEBUG) {
-				Serial.println("Can not reach position");
-			}
-			break;
-		}
-	}
-	driver.AMAX(0);
-	driver.VMAX(0);
-	driver.RAMPMODE(1);				//Zurücksetzen auf Geschwindigkeitsmodus
+	driver.RAMPMODE(0);			                                //Setzen des Positionierungsmodus
+	driver.XTARGET((uint32_t)(position/output_scaling)); // Zielposition umwandeln in Inkremente
 }
 
 //StallGuard Konfiguration
@@ -276,7 +216,8 @@ void writeVelocity(double vel) {
   uint32_t VMAX_setting = (vel_ustep * pow(2, 24)) / F_CLK;              //VMAX Parameter
   if (VMAX_setting > 0x7FFE00) { VMAX_setting = 0x7FFE00; }              //VMAX auf Register Maximum begrenzen (2^23)-512
   driver.VMAX(VMAX_setting);                                             //Parameter schreiben
-
+  //für Positionierung erforderlich ???performance	
+  driver.v1(VMAX_setting);												 	
   //aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
   absVelocitySet = abs_vel;
   if (DEBUG) {
@@ -303,6 +244,10 @@ void writeAcceleration(double acceleration) {
   uint32_t AMAX_setting = (acc_ustep * pow(2, 41)) / ((double)F_CLK * (double)F_CLK);  //AMAX Parameter
   if (AMAX_setting > 0xFFFF) { AMAX_setting = 0xFFFF; }                                //AMAX auf Register Maximum begrenzen  0…(2^16)-1
   driver.AMAX(AMAX_setting);                                                           //Parameter schreiben
+  //für Positionierung erforderlich ???performance
+  driver.DMAX(AMAX_setting);
+  driver.a1(AMAX_setting);  															      
+  driver.d1(AMAX_setting);
 
   //aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
   absAccelerationSet = abs_acc;
@@ -389,4 +334,52 @@ double getSetAcceleration() {
     return -absAccelerationSet;  //Linkslauf
   }
 }
+
+
+//Ausgabe des driver status registers
+void print_drv_status_register(void) {
+  uint32_t drv_status = driver.DRV_STATUS();
+  // Einzelne Felder extrahieren
+  uint16_t sg_result = drv_status & 0x03FF;
+  bool s2vsa = drv_status & 0x1000;
+  bool s2vsb = drv_status & 0x2000;
+  bool stealth = drv_status & 0x4000;
+  uint8_t cs_actual = (drv_status >> 16) & 0x1F;
+  bool stallGuard = (drv_status >> 24) & 0x01;
+  bool ot = (drv_status >> 25) & 0x01;
+  bool otpw = (drv_status >> 26) & 0x01;
+  bool s2ga = (drv_status >> 27) & 0x01;
+  bool s2gb = (drv_status >> 28) & 0x01;
+  bool ola = (drv_status >> 29) & 0x01;
+  bool olb = (drv_status >> 30) & 0x01;
+  bool stst = (drv_status >> 31) & 0x01;
+
+  Serial.print("SG_RESULT: ");
+  Serial.println(sg_result);
+  Serial.print("s2vsa: ");
+  Serial.println(s2vsa);
+  Serial.print("s2vsb ");
+  Serial.println(s2vsb);
+  Serial.print("stealth: ");
+  Serial.println(stealth);
+  Serial.print("CS_ACTUAL (rms): ");
+  Serial.println(cs_actual);  // RMS-Strom umgerechnet
+  Serial.print(" StallGuard Flag: ");
+  Serial.println(stallGuard);
+  Serial.print("Overtemp Error: ");
+  Serial.println(ot);
+  Serial.print("Overtemp Warn: ");
+  Serial.println(otpw);
+  Serial.print("Short to GND A: ");
+  Serial.println(s2ga);
+  Serial.print("Short to GND B: ");
+  Serial.println(s2gb);
+  Serial.print("Open Load A: ");
+  Serial.println(ola);
+  Serial.print("Open Load B: ");
+  Serial.println(olb);
+  Serial.print("Driver Enabled (STST): ");
+  Serial.println(stst);
+}
+
 

@@ -78,8 +78,8 @@
 // MOTION LIMITS
 // =============================================================================
 #define HOME_VELOCIY 0.7     //in m/s
-#define MAX_ACC 	13.0     //in m/s² (bei Umfang=0.157 maximal 13 m/s²)
-#define MAX_VEL 	18.0     //in m/s (bei Umfang=0.157 maximal 18 m/s)
+#define MAX_ACC 	20.0     //in m/s² 
+#define MAX_VEL 	2.0     //in m/s 
 
 // =============================================================================
 // PENDULUM AND CART ENCODER
@@ -106,7 +106,7 @@
 #define POW_2_24 		16777216.0  		// 2^24 for calculations
 #define POW_2_41 		2199023255552.0  	// 2^41 for calculations
 #define AMAX_MAX_ACC 	65535     		  	// Maximum AMAX register value
-#define U_STEPS 		256L      			//µSteps pro Vollschritt
+#define U_STEPS 		40L      			//µSteps pro Vollschritt
 #define MOTOR_STEPS 	200L  				//200 Vollschritte
 
 // =============================================================================
