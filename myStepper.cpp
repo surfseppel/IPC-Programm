@@ -12,6 +12,13 @@ double output_scaling = CART_SCALING; 	//Weg in m
 uint8_t rampModeSetting = 1;    		//1=Rechtslauf, 2=Linkslauf
 uint8_t referenced = 1;					//??? 0 Anlage nicht referenziert/1 Anlage referenziert 
 
+typedef enum {
+    MODE_VELOCITY,   // Geschwindigkeitsmodus
+    MODE_POSITION    // Positioniermodus
+} MotionMode;
+
+static MotionMode currentMode = MODE_VELOCITY;  // Standard: Geschwindigkeit
+
 //Einstellung des Motortreibers
 void initStepper(void) {
   if (DEBUG) {
@@ -89,6 +96,19 @@ void initStepper(void) {
   Serial.println("stepper enable");
 }
 
+//setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus
+void setMode(MotionMode mode) {
+    currentMode = mode;
+	if (currentMode == MODE_POSITION) { 
+		driver.RAMPMODE(0);
+	} else if (currentMode == MODE_VELOCITY){
+		quickStop(); 			//??? Motor stoppen
+		driver.RAMPMODE(1); 	//??? auf Rechtslauf setzen 
+	} else {
+		Serial.println("invalide mode");
+	}			     
+}
+
 //Aktuelle Position des Motors auslesen
 double getPosition(void) {
   return (float)driver.XACTUAL()*output_scaling; // Liest die aktuelle Position aus dem XACTUAL Register
@@ -114,13 +134,16 @@ void goAbsolute(double position, double vel, double acc){
 			Serial.println("plant not referenced");		
 		}
 		return;
-	}
+	}	
+	//setzen auf Positionierungsmodus
+	if (currentMode == MODE_VELOCITY) {
+		setMode(MODE_POSITION);
+	} 
  	writeVelocity(vel);
-	writeAcceleration(acc);
+    writeAcceleration(acc);
 	driver.VSTART(0);       
 	driver.VSTOP(10);       
-	driver.TZEROWAIT(0);  
-	driver.RAMPMODE(0);			                                //Setzen des Positionierungsmodus
+	driver.TZEROWAIT(0);                         
 	driver.XTARGET((uint32_t)(position/output_scaling)); // Zielposition umwandeln in Inkremente
 }
 
@@ -216,8 +239,8 @@ void writeVelocity(double vel) {
   uint32_t VMAX_setting = (vel_ustep * pow(2, 24)) / F_CLK;              //VMAX Parameter
   if (VMAX_setting > 0x7FFE00) { VMAX_setting = 0x7FFE00; }              //VMAX auf Register Maximum begrenzen (2^23)-512
   driver.VMAX(VMAX_setting);                                             //Parameter schreiben
-  //für Positionierung erforderlich ???performance	
-  driver.v1(VMAX_setting);												 	
+  //für Positionierung erforderlich
+  if (currentMode == MODE_POSITION) { driver.v1(VMAX_setting); }												 	
   //aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
   absVelocitySet = abs_vel;
   if (DEBUG) {
@@ -244,10 +267,12 @@ void writeAcceleration(double acceleration) {
   uint32_t AMAX_setting = (acc_ustep * pow(2, 41)) / ((double)F_CLK * (double)F_CLK);  //AMAX Parameter
   if (AMAX_setting > 0xFFFF) { AMAX_setting = 0xFFFF; }                                //AMAX auf Register Maximum begrenzen  0…(2^16)-1
   driver.AMAX(AMAX_setting);                                                           //Parameter schreiben
-  //für Positionierung erforderlich ???performance
-  driver.DMAX(AMAX_setting);
-  driver.a1(AMAX_setting);  															      
-  driver.d1(AMAX_setting);
+  //für Positionierung erforderlich
+  if (currentMode == MODE_POSITION) {
+	driver.DMAX(AMAX_setting);
+	driver.a1(AMAX_setting);  															      
+	driver.d1(AMAX_setting);
+  }
 
   //aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
   absAccelerationSet = abs_acc;
@@ -337,7 +362,7 @@ double getSetAcceleration() {
 
 
 //Ausgabe des driver status registers
-void print_drv_status_register(void) {
+void log_drv_status_register(void) {
   uint32_t drv_status = driver.DRV_STATUS();
   // Einzelne Felder extrahieren
   uint16_t sg_result = drv_status & 0x03FF;

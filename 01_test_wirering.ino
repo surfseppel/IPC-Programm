@@ -3,163 +3,166 @@
 
 //toDo:
 /*
-- Es wird erforderlich sich eine Funktion zu schreiben, die Positionieren kann.
-setPositionMode() ???
-goToPositon(double position)
-
-
 - Taktfrequenz noch mal für den TMC5160 einstellen ???
 - Stepper lib testen mit motor Referenzfahrt programmieren
 
-??? vernüftige log Funktion programmieren mit den erforderlichen Prozessdaten
-
-General Configuration Registers
-	GCONF – Global configuration flags 	=> Bit 0 - Bit 17 
-	GSTAT – Global status flags			=> Bit 0 - Bit 2
-	INPUT								=> Bit 0 - Bit 7
-
-global status flags
-
-GSTAT – Global status flags 
-Bit 0
-Bit 1
-Bit 2
-
+-teste 40 µSteps
+-Anlage aktuell referenziert
 */
+
+unsigned long startTime = millis();
+ unsigned long intervalTime = 0;
+double targetPosition = 0;
+double velocity = 1.0;
+double acceleration = 1.0;
+
 
 void setup() {
   Serial.begin(230400);
-  delay(5000);
+  while (!Serial && millis() - startTime < 5000);
   initStepper();
+
+  Serial.println("======================================");
+  Serial.println("       Test Rampen                    ");
+  Serial.println("======================================");
+
+  //Messung der Zeit für das langsame Verfahren tges=10 sek.
+  startTime = millis();
   delay(1000);
-  /*
-  //langsam
-  Serial.println("langsam fahren");
-  driver.RAMPMODE(1); 
+  Serial.println("");
+  Serial.println("Fahren: langsam rechts");
+  Serial.println("In 1 sek. auf 0.1 m/s beschleunigen");
+  Serial.println("   2 sek. mit 0.1 m/s fahren");
+  Serial.println("In 1 sek. auf 0.0 m/s bremsen");
+  writeDirection(1);
   writeAcceleration(0.1);
   writeVelocity(0.1);
-  
-  delay(2000);
-  
-  driver.RAMPMODE(2); 
+  delay(4000);
+  writeVelocity(0.0);
+  delay(1000);
+  Serial.println("");
+  Serial.println("Fahren: langsam links");
+  Serial.println("In 1 sek. auf 0.1 m/s beschleunigen");
+  Serial.println("   2 sek. mit 0.1 m/s fahren");
+  Serial.println("In 1 sek. auf 0.0 m/s bremsen");
+  writeDirection(0);
   writeAcceleration(0.1);
   writeVelocity(0.1);
+  delay(4000);
+  writeVelocity(0.0);
+  while (getActualVelocity() >= 0.01);
+  intervalTime = millis() - startTime;
+  Serial.println("");
+  Serial.print("Fahrdiagramm langsam tges: ");
+  Serial.println(intervalTime);
 
+
+  //Messung der Zeit für das schnelle Verfahren tges=30 sek.
+  startTime = millis();
+  delay(1000);
+  Serial.println("");
+  Serial.println("Fahren: schnell rechts");
+  Serial.println("In 4 sek. auf 1 m/s beschleunigen");
+  Serial.println("   4 sek. mit 1 m/s fahren");
+  Serial.println("In 4 sek. auf 0 m/s bremsen");
+  writeDirection(1);
+  writeAcceleration(0.25);
+  writeVelocity(1.0);
+  delay(4000);
+  writeVelocity(0.0);
+  delay(1000);
+  Serial.println("");
+  Serial.println("Fahren: schnell links");
+  Serial.println("In 1 sek. auf 0.1 m/s beschleunigen");
+  Serial.println("   2 sek. mit 0.1 m/s fahren");
+  Serial.println("In 1 sek. auf 0.0 m/s bremsen");
+  writeDirection(0);
+  writeAcceleration(0.25);
+  writeVelocity(1.0);
+  delay(4000);
+  writeVelocity(0.0);
+  while (getActualVelocity() >= 0.01);
+  intervalTime = millis() - startTime;
+  Serial.println("");
+  Serial.print("Fahrdiagramm schnell tges: ");
+  Serial.println(intervalTime);
   delay(2000);
 
-   //test disable motor
-   Serial.println("Motor deaktivieren => Motor bleibt stehen, enablePin = HIGH");
-   disableMotor();
-   
-   delay(5000);
-
-   Serial.println("Motor aktivieren => Motor fährt wieder, enablePin = LOW"); 
-   enableMotor();
-
-
-   delay(5000);
-
-  //schnell
-  Serial.println("schnell fahren");
-  driver.RAMPMODE(1); 
-  writeAcceleration(1);
-  writeVelocity(1);
-  
-  delay(2000);
-  
-  driver.RAMPMODE(2); 
-  writeAcceleration(1);
-  writeVelocity(1);
-
-  delay(2000);
-
-  //test stop motor
+  Serial.println("======================================");
+  Serial.println("       Test Motor disable             ");
+  Serial.println("======================================");
+  delay(1000);
+  setVelocity(1.0);
+  delay(1000);
+  //test disable motor
+  Serial.println("Motor deaktivieren => Motor bleibt stehen, enablePin = HIGH");
+  delay(1000);
+  disableMotor();
+  delay(1000);
+  Serial.println("Motor aktivieren => Motor fährt wieder, enablePin = LOW");
+  enableMotor();
+  Serial.println("");
+  Serial.println("======================================");
+  Serial.println("       Test Motor quickstop           ");
+  Serial.println("======================================");
+  delay(1000);
   Serial.println("Schnellstopp => Motor steht");
+  delay(1000);
   quickStop();
+  delay(1000);
 
-  delay(2000);
-*/
-  //positionieren
-  Serial.println("Positionierung");
- 
- driver.RAMPMODE(0);
+  Serial.println("======================================");
+  Serial.println("       Test Motor Positionieren       ");
+  Serial.println("======================================");
 
-	driver.AMAX(1000);       //2. Beschleunigung in steps/s² wenn: v > v1  
-	driver.DMAX(1000);       //1. Verzögerung in steps/s² wenn: v > v1
-  driver.VMAX(1000);    // Maximale Geschwindigkeit in steps/s 
-  driver.VSTART(0);       // Startgeschwindigkeit der Rampe hier nicht genutzt
-	driver.VSTOP(10);       // Geschwindigkeit, bei der der Motor stoppt, wenn: v < 10, dann v = 0 
-  driver.TZEROWAIT(0);    // Wartezeit zwischen Stoppen und starten des Motors
-  driver.a1(1000);        //1. Beschleunigung in steps/s², wenn: v > VSTART und v < v1
-  driver.d1(1000);        //2. Verzögerung in steps/s², wenn v < v1
-	driver.v1(1000);       //Geschwindigkeit bei der die Beschleunigung umschaltet
+  setPosition(0);  
+  targetPosition = 1.0;
 
-
-  driver.XACTUAL(0);       //Aktuelle Position auf 0 setzen
-  driver.XTARGET(-51200);  // Zielposition auf -51200 setzen
+  Serial.printf("Aktuelle Position: %f m", getPosition());
+  startTime = millis();
 }
 
 void loop() {
-  delay(1000);
+  unsigned long currTime = millis();
+  goAbsolute(targetPosition, velocity, acceleration); 
 
-  auto xactual = driver.XACTUAL();  //aktuelle Position
-  auto xtarget = driver.XTARGET();  //Zielposition
-  auto vactual = driver.VACTUAL();  //aktuelle Geschwingigkeit
+  if(currTime >= startTime + 1000){
+    startTime = millis();
+    Serial.print("Position: "); Serial.print (getPosition()); Serial.print("Geschwindigkeit: "); Serial.println(getActualVelocity());
 
-  char buffer[256];
-  sprintf(buffer, "ioin=%#-10lx xactual=%7ld vactual=%7ld xtarget=%7ld\n", driver.IOIN(), xactual, vactual, xtarget);
-  Serial.print(buffer);
-
-  if (xactual == xtarget) {
-    driver.XTARGET(-xactual);
   }
-
+  
+  if (getPosition() == targetPosition) {
+    targetPosition = -targetPosition;
+  }
 }
+/*
+void log() {
 
-
-
-void print_drv_status_register(void) {
-  uint32_t drv_status = driver.DRV_STATUS();
-  // Einzelne Felder extrahieren
-  uint16_t sg_result = drv_status & 0x03FF;
-  bool s2vsa = drv_status & 0x1000;
-  bool s2vsb = drv_status & 0x2000;
-  bool stealth = drv_status & 0x4000;
-  uint8_t cs_actual = (drv_status >> 16) & 0x1F;
-  bool stallGuard = (drv_status >> 24) & 0x01;
-  bool ot = (drv_status >> 25) & 0x01;
-  bool otpw = (drv_status >> 26) & 0x01;
-  bool s2ga = (drv_status >> 27) & 0x01;
-  bool s2gb = (drv_status >> 28) & 0x01;
-  bool ola = (drv_status >> 29) & 0x01;
-  bool olb = (drv_status >> 30) & 0x01;
-  bool stst = (drv_status >> 31) & 0x01;
-
-  // Nur SG_RESULT und StallGuard Flag ausgeben
-  Serial.print("SG_RESULT: ");
-  Serial.println(sg_result);
-  Serial.print("s2vsa: ");
-  Serial.println(s2vsa);
-  Serial.print("s2vsb ");
-  Serial.println(s2vsb);
-  Serial.print("stealth: ");
-  Serial.println(stealth);
-  Serial.print("CS_ACTUAL (rms): ");
-  Serial.println(cs_actual);  // RMS-Strom umgerechnet
-  Serial.print(" StallGuard Flag: ");
-  Serial.println(stallGuard);
-  Serial.print("Overtemp Error: ");
-  Serial.println(ot);
-  Serial.print("Overtemp Warn: ");
-  Serial.println(otpw);
-  Serial.print("Short to GND A: ");
-  Serial.println(s2ga);
-  Serial.print("Short to GND B: ");
-  Serial.println(s2gb);
-  Serial.print("Open Load A: ");
-  Serial.println(ola);
-  Serial.print("Open Load B: ");
-  Serial.println(olb);
-  Serial.print("Driver Enabled (STST): ");
-  Serial.println(stst);
+  if (micros() > log_t_micros + 5'000) {
+    log_t_micros = micros();
+    SerialUSB1.print(millis() - time);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(cart.get_position(), 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(motor.get_actual_velocity(), 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(pendulum.get_position(), 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(pendulum.get_velocity(), 1);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(ctrl.rtY.x_hat[0], 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(ctrl.rtY.x_hat[1], 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(ctrl.rtY.x_hat[2], 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.print(ctrl.rtY.x_hat[3], 4);
+    SerialUSB1.print("\t");
+    SerialUSB1.println(motor.get_set_acceleration(), 4);
+    SerialUSB1.send_now();
+  }
+  return;
+ 
 }
+*/
