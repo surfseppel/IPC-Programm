@@ -1,6 +1,7 @@
 //Einbinden der Bibliotheken
 #include "myGlobals.h"
 #include "myStepper.h"
+#include <math.h>   // für fabs()
 
 //Globale Varialben
 TMC5160Stepper driver(CSPIN, 0.075);  	//Hardware SPI, RMS Strom 3,11A 
@@ -8,16 +9,10 @@ bool motorDisable = true;       		//Motortreiber deaktiviert
 bool motorDirection = true;     		//Motorrichtung true=Rechtslauf, false=Linkslauf
 double absVelocitySet = 0;      		//Betrag der aktuell gesetzten Geschwindigkeit (muss noch nicht erreicht sein)
 double absAccelerationSet = 0;  		//Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
-double output_scaling = CART_SCALING; 	//Weg in m
 uint8_t rampModeSetting = 1;    		//1=Rechtslauf, 2=Linkslauf
 uint8_t referenced = 1;					//??? 0 Anlage nicht referenziert/1 Anlage referenziert 
 
-typedef enum {
-    MODE_VELOCITY,   // Geschwindigkeitsmodus
-    MODE_POSITION    // Positioniermodus
-} MotionMode;
-
-static MotionMode currentMode = MODE_VELOCITY;  // Standard: Geschwindigkeit
+MotionMode currentMode = MODE_VELOCITY;  // Standard: Geschwindigkeit
 
 //Einstellung des Motortreibers
 void initStepper(void) {
@@ -92,6 +87,8 @@ void initStepper(void) {
   //Setzen der aktuelle/Zielposition
   driver.XACTUAL(0);  //Aktuelle Position auf 0 setzen
   driver.XTARGET(0);  //Zielpositione auf 0 setzen
+  driver.RAMPMODE(1); //Rechtslauf setzen
+  delay(5000);
   Serial.println("Stepper initialized");
   Serial.println("stepper enable");
 }
@@ -100,6 +97,7 @@ void initStepper(void) {
 void setMode(MotionMode mode) {
     currentMode = mode;
 	if (currentMode == MODE_POSITION) { 
+		quickStop();			//??? Motor stoppen
 		driver.RAMPMODE(0);
 	} else if (currentMode == MODE_VELOCITY){
 		quickStop(); 			//??? Motor stoppen
@@ -111,14 +109,17 @@ void setMode(MotionMode mode) {
 
 //Aktuelle Position des Motors auslesen
 double getPosition(void) {
-  return (float)driver.XACTUAL()*output_scaling; // Liest die aktuelle Position aus dem XACTUAL Register
+  return (float)driver.XACTUAL()*PULLEY_CIRCUM/double(CART_COUNT); // Liest die aktuelle Position aus dem XACTUAL Register
 }
 
 //Aktuelle Position des Motors mit einem bestimmten Wert beschreiben. 
 //Der eingegebene Wert wird durch den Skalierungsfaktor geteilt, um den 
 //entsprechenden rohen Encoder-Wert zu erhalten
-void setPosition(double position) {	    
-  driver.XACTUAL((int32_t)(position / output_scaling));  // Setzt die aktuelle Position im XACTUAL Register
+void setPosition(double position) {
+  //Begrenzung auf +-1000 m    
+  if(position > 1000) position = 1000;
+  if(position < -1000) position = -1000;
+  driver.XACTUAL((int32_t)(position*CART_COUNT/PULLEY_CIRCUM));  // Setzt die aktuelle Position im XACTUAL Register
 }
 
 //Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
@@ -143,8 +144,11 @@ void goAbsolute(double position, double vel, double acc){
     writeAcceleration(acc);
 	driver.VSTART(0);       
 	driver.VSTOP(10);       
-	driver.TZEROWAIT(0);                         
-	driver.XTARGET((uint32_t)(position/output_scaling)); // Zielposition umwandeln in Inkremente
+	driver.TZEROWAIT(0);  
+  //Begrenzung auf +-1000 m    
+  if(position > 1000) position = 1000;
+  if(position < -1000) position = -1000;
+	driver.XTARGET((int32_t)(position*CART_COUNT/PULLEY_CIRCUM)); // Zielposition umwandeln in Inkremente
 }
 
 //StallGuard Konfiguration
@@ -225,9 +229,9 @@ void writeVelocity(double vel) {
   if (motorDisable) {
     return;  // Motor deaktiviert, erfordert Reset
   }
-  double abs_vel = abs(vel);  //Betrag bestimmen
+  double abs_vel = fabs(vel);  //Betrag bestimmen
   //Filter für minimale Abweichungen
-  if (abs(absVelocitySet - abs_vel) < 0.001) {
+  if (fabs(absVelocitySet - abs_vel) < 0.001) {
     return;  //Geschwindikeit ist ausreichend gesetzt
   }
   //Begrenzung der Geschwindigkeit zwischen 0 und max. Geschwindigkeit
@@ -252,10 +256,10 @@ void writeVelocity(double vel) {
 }
 //Setzen der Beschleunigung im AMAX Register
 void writeAcceleration(double acceleration) {
-  double abs_acc = abs(acceleration);  //Betrag bestimmen
+  double abs_acc = fabs(acceleration);  //Betrag bestimmen
 
   //Filter für minimale Abweichungen
-  if (abs(absAccelerationSet - abs_acc) < 0.001) {
+  if (fabs(absAccelerationSet - abs_acc) < 0.001) {
     return;  //Beschleunigung ist ausreichend gesetzt
   }
   //Begrenzung der Beschleunigung zwischen 0 und max. Beschleunigung
@@ -318,13 +322,13 @@ void quickStop() {
   if (motorDisable) { return; }
   driver.AMAX(AMAX_MAX_ACC);  //max. Beschleunigung
   driver.VMAX(0);             //Geschwindigkeit auf 0
-  motorDisable = true;        //Motor deaktiviert
   if (DEBUG) { Serial.println("quick stop"); }
   return;
 }
 // Motor deaktivieren
 void disableMotor() {
   digitalWrite(ENABLEPIN, HIGH);  //Motor deaktiviert
+  //referenced = 0,                 //??? Referenz geht verloren?
   motorDisable = true;
   if (DEBUG) { Serial.println("DRV disable"); }
 }

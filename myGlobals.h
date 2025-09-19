@@ -82,6 +82,18 @@
 #define MAX_VEL 	2.0     //in m/s 
 
 // =============================================================================
+// TMC5160 SPECIFIC CONSTANTS
+// =============================================================================
+#define F_CLK 			12000000UL			// TMC5160 clock frequency Hz
+#define TMC5160_SPI_CLK 5000000             //5Mhz (max. half F_CLK)
+#define RMS_CURRENT     400                 //RMS Motorstrom in mA
+#define POW_2_24 		16777216.0  		// 2^24 for calculations
+#define POW_2_41 		2199023255552.0  	// 2^41 for calculations
+#define AMAX_MAX_ACC 	65535     		  	// Maximum AMAX register value
+#define U_STEPS 		256     			//µSteps pro Vollschritt
+#define MOTOR_STEPS 	200  				//200 Vollschritte
+
+// =============================================================================
 // PENDULUM AND CART ENCODER
 // =============================================================================
 #define CART_COUNT 			U_STEPS*MOTOR_STEPS			// Steps per round 
@@ -97,17 +109,7 @@
 #define RAMPMODE_POS 	1
 #define RAMPMODE_NEG 	2
 
-// =============================================================================
-// TMC5160 SPECIFIC CONSTANTS
-// =============================================================================
-#define F_CLK 			12000000UL			// TMC5160 clock frequency Hz
-#define TMC5160_SPI_CLK 5000000             //5Mhz (max. half F_CLK)
-#define RMS_CURRENT     400                 //RMS Motorstrom in mA
-#define POW_2_24 		16777216.0  		// 2^24 for calculations
-#define POW_2_41 		2199023255552.0  	// 2^41 for calculations
-#define AMAX_MAX_ACC 	65535     		  	// Maximum AMAX register value
-#define U_STEPS 		40L      			//µSteps pro Vollschritt
-#define MOTOR_STEPS 	200L  				//200 Vollschritte
+
 
 // =============================================================================
 // DEBUGGING AND DIAGNOSTICS

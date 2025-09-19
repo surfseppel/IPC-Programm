@@ -11,12 +11,20 @@ extern double absVelocitySet;      //Betrag der aktuell gesetzten Geschwindigkei
 extern double absAccelerationSet;  //Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
 extern uint8_t rampModeSetting;    //1=Rechtslauf, 2=Linkslauf
 
+
+typedef enum {
+    MODE_VELOCITY,   // Geschwindigkeitsmodus
+    MODE_POSITION    // Positioniermodus
+} MotionMode;
+
 // =============================================================================
 // TMC5160 Funktionen
 // =============================================================================
 
 //Einstellung des Motortreibers
 void initStepper(void);
+//setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus
+void setMode(MotionMode mode);
 //Aktuelle Position des Motors auslesen
 double getPosition(void);
 //Aktuelle Position des Motors auf einen neuen Wert setzen
