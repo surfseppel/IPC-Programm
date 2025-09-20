@@ -1,16 +1,16 @@
 //Einbinden der Bibliotheken
 #include "myGlobals.h"
 #include "myStepper.h"
-#include <math.h>   // für fabs()
+#include <math.h>  // für fabs()
 
 //Globale Varialben
-TMC5160Stepper driver(CSPIN, 0.075);  	//Hardware SPI, RMS Strom 3,11A 
-bool motorDisable = true;       		//Motortreiber deaktiviert
-bool motorDirection = true;     		//Motorrichtung true=Rechtslauf, false=Linkslauf
-double absVelocitySet = 0;      		//Betrag der aktuell gesetzten Geschwindigkeit (muss noch nicht erreicht sein)
-double absAccelerationSet = 0;  		//Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
-uint8_t rampModeSetting = 1;    		//1=Rechtslauf, 2=Linkslauf
-uint8_t referenced = 1;					//??? 0 Anlage nicht referenziert/1 Anlage referenziert 
+TMC5160Stepper driver(CSPIN, 0.075);  //Hardware SPI, RMS Strom 3,11A
+bool motorDisable = true;             //Motortreiber deaktiviert
+bool motorDirection = true;           //Motorrichtung true=Rechtslauf, false=Linkslauf
+double absVelocitySet = 0;            //Betrag der aktuell gesetzten Geschwindigkeit (muss noch nicht erreicht sein)
+double absAccelerationSet = 0;        //Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
+uint8_t rampModeSetting = 1;          //1=Rechtslauf, 2=Linkslauf
+uint8_t referenced = 1;               //??? 0 Anlage nicht referenziert/1 Anlage referenziert
 
 MotionMode currentMode = MODE_VELOCITY;  // Standard: Geschwindigkeit
 
@@ -26,18 +26,23 @@ void initStepper(void) {
   pinMode(CSPIN, OUTPUT);
 
   //SPI starten, 5 MHz, MSB first, Mode 3 (TMC5160 erwartet Mode 3)
-  driver.setSPISpeed(TMC5160_SPI_CLK); 
+  driver.setSPISpeed(TMC5160_SPI_CLK);
   SPI.begin();
 
-  //??? Setzen der Clock für den TMC5160Stepper
-  digitalWrite(CLOCKPIN, LOW); //intere Clock aktiviert
-  //analogWriteFrequency(CLOCKPIN, F_CLK);
-  //analogWrite(CLOCKPIN, 128);
-  //??? ende 
-  
+//??? Setzen der Clock für den TMC5160Stepper
+#if defined(ARDUINO_AVR_UNO)
+  digitalWrite(CLOCKPIN, LOW);  //intere Clock aktiviert
+#elif defined(ESP32)
+  digitalWrite(CLOCKPIN, LOW);  //intere Clock aktiviert
+#else
+  analogWriteFrequency(CLOCKPIN, F_CLK);
+  analogWrite(CLOCKPIN, 128);
+#endif
+  //??? ende
+
   //Reset Treiber
   digitalWrite(ENABLEPIN, HIGH);  //Treiber deaktivieren (low active)
-  writeAcceleration(0);        
+  writeAcceleration(0);
   writeVelocity(0);
   digitalWrite(VCC_IO_PIN, LOW);  // Toggle VCC PIN => Reset driver
   delay(2);
@@ -85,70 +90,72 @@ void initStepper(void) {
   driver.TZEROWAIT(0);  // Wartezeit zwischen Stoppen und starten des Motors
 
   //Setzen der aktuelle/Zielposition
-  driver.XACTUAL(0);  //Aktuelle Position auf 0 setzen
-  driver.XTARGET(0);  //Zielpositione auf 0 setzen
-  driver.RAMPMODE(1); //Rechtslauf setzen
+  driver.XACTUAL(0);   //Aktuelle Position auf 0 setzen
+  driver.XTARGET(0);   //Zielpositione auf 0 setzen
+  driver.RAMPMODE(1);  //Rechtslauf setzen
   delay(5000);
-  Serial.println("Stepper initialized");
-  Serial.println("stepper enable");
+  Serial.println("stepper initialized and enable");
 }
 
 //setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus
 void setMode(MotionMode mode) {
-    currentMode = mode;
-	if (currentMode == MODE_POSITION) { 
-		quickStop();			//??? Motor stoppen
-		driver.RAMPMODE(0);
-	} else if (currentMode == MODE_VELOCITY){
-		quickStop(); 			//??? Motor stoppen
-		driver.RAMPMODE(1); 	//??? auf Rechtslauf setzen 
-	} else {
-		Serial.println("invalide mode");
-	}			     
+  currentMode = mode;
+  if (currentMode == MODE_POSITION) {
+    quickStop();  //??? Motor stoppen
+    driver.RAMPMODE(0);
+  } else if (currentMode == MODE_VELOCITY) {
+    quickStop();         //??? Motor stoppen
+    driver.RAMPMODE(1);  //??? auf Rechtslauf setzen
+  } else {
+    Serial.println("invalide mode");
+  }
 }
 
 //Aktuelle Position des Motors auslesen
-double getPosition(void) {
-  return (float)driver.XACTUAL()*PULLEY_CIRCUM/double(CART_COUNT); // Liest die aktuelle Position aus dem XACTUAL Register
+double getCurrentPosition(void) {
+  return (float)driver.XACTUAL() * PULLEY_CIRCUM / double(CART_COUNT);  // Liest die aktuelle Position aus dem XACTUAL Register
 }
 
-//Aktuelle Position des Motors mit einem bestimmten Wert beschreiben. 
-//Der eingegebene Wert wird durch den Skalierungsfaktor geteilt, um den 
+//Zielposition des Motors auslesen
+double getTargetPosition(void) {
+  return (float)driver.XTARGET() * PULLEY_CIRCUM / double(CART_COUNT);  // Liest die Zielposition aus dem XTARGET Register
+}
+
+//Aktuelle Position des Motors mit einem bestimmten Wert beschreiben.
+//Der eingegebene Wert wird durch den Skalierungsfaktor geteilt, um den
 //entsprechenden rohen Encoder-Wert zu erhalten
 void setPosition(double position) {
-  //Begrenzung auf +-1000 m    
-  if(position > 1000) position = 1000;
-  if(position < -1000) position = -1000;
-  driver.XACTUAL((int32_t)(position*CART_COUNT/PULLEY_CIRCUM));  // Setzt die aktuelle Position im XACTUAL Register
+  //Begrenzung auf +-1000 m
+  if (position > 1000) position = 1000;
+  if (position < -1000) position = -1000;
+  driver.XACTUAL((int32_t)(position * CART_COUNT / PULLEY_CIRCUM));  // Setzt die aktuelle Position im XACTUAL Register
 }
 
 //Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
-void goAbsolute(double position, double vel, double acc){
-	if (motorDisable){
-		if (DEBUG) {
-			Serial.println("motor disable");			
-		}
-		return;
-	}
-	if (!referenced){
-		if (DEBUG) {
-			Serial.println("plant not referenced");		
-		}
-		return;
-	}	
-	//setzen auf Positionierungsmodus
-	if (currentMode == MODE_VELOCITY) {
-		setMode(MODE_POSITION);
-	} 
- 	writeVelocity(vel);
-    writeAcceleration(acc);
-	driver.VSTART(0);       
-	driver.VSTOP(10);       
-	driver.TZEROWAIT(0);  
-  //Begrenzung auf +-1000 m    
-  if(position > 1000) position = 1000;
-  if(position < -1000) position = -1000;
-	driver.XTARGET((int32_t)(position*CART_COUNT/PULLEY_CIRCUM)); // Zielposition umwandeln in Inkremente
+void goAbsolute(double position) {
+  if (motorDisable) {
+    if (DEBUG) {
+      Serial.println("motor disable");
+    }
+    return;
+  }
+  if (!referenced) {
+    if (DEBUG) {
+      Serial.println("plant not referenced");
+    }
+    return;
+  }
+  //setzen auf Positionierungsmodus
+  if (currentMode == MODE_VELOCITY) {
+    setMode(MODE_POSITION);
+  }
+  driver.VSTART(0);
+  driver.VSTOP(10);
+  driver.TZEROWAIT(0);
+  //Begrenzung auf +-1000 m
+  if (position > 1000) position = 1000;
+  if (position < -1000) position = -1000;
+  driver.XTARGET((int32_t)(position * CART_COUNT / PULLEY_CIRCUM));  // Zielposition umwandeln in Inkremente
 }
 
 //StallGuard Konfiguration
@@ -244,7 +251,7 @@ void writeVelocity(double vel) {
   if (VMAX_setting > 0x7FFE00) { VMAX_setting = 0x7FFE00; }              //VMAX auf Register Maximum begrenzen (2^23)-512
   driver.VMAX(VMAX_setting);                                             //Parameter schreiben
   //für Positionierung erforderlich
-  if (currentMode == MODE_POSITION) { driver.v1(VMAX_setting); }												 	
+  if (currentMode == MODE_POSITION) { driver.v1(VMAX_setting); }
   //aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
   absVelocitySet = abs_vel;
   if (DEBUG) {
@@ -273,9 +280,9 @@ void writeAcceleration(double acceleration) {
   driver.AMAX(AMAX_setting);                                                           //Parameter schreiben
   //für Positionierung erforderlich
   if (currentMode == MODE_POSITION) {
-	driver.DMAX(AMAX_setting);
-	driver.a1(AMAX_setting);  															      
-	driver.d1(AMAX_setting);
+    driver.DMAX(AMAX_setting);
+    driver.a1(AMAX_setting);
+    driver.d1(AMAX_setting);
   }
 
   //aktuell gesetzten Wert speichern, erforderlich für Filterung minimaler Abweichungen
@@ -347,7 +354,7 @@ double getSetVelocity() {
     return -absVelocitySet;  //Linkslauf
   }
 }
-//Rückgabe der aktuellen Sollbeschleunigung (nicht Istbeschleunigung)
+//Rückgabe der aktuellen Istbeschleunigung (nicht statischer Registerwert)
 double getSetAcceleration() {
   if (motorDisable) {
     return 0;
@@ -363,7 +370,15 @@ double getSetAcceleration() {
     return -absAccelerationSet;  //Linkslauf
   }
 }
-
+//Ausgabe des motion control registersn
+void print_motion_ctl_register(void) {
+  int32_t xactual = driver.XACTUAL();  //aktuelle Position
+  int32_t xtarget = driver.XTARGET();  //Zielposition
+  int32_t vactual = driver.VACTUAL();  //aktuelle Geschwingigkeit
+  char buffer[256];
+  sprintf(buffer, "ioin=%#-10lx xactual=%7ld vactual=%7ld xtarget=%7ld \n", driver.IOIN(), xactual, vactual, xtarget);
+  Serial.println(buffer);
+}
 
 //Ausgabe des driver status registers
 void log_drv_status_register(void) {
@@ -410,5 +425,3 @@ void log_drv_status_register(void) {
   Serial.print("Driver Enabled (STST): ");
   Serial.println(stst);
 }
-
-

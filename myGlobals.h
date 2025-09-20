@@ -78,7 +78,7 @@
 // MOTION LIMITS
 // =============================================================================
 #define HOME_VELOCIY 0.7     //in m/s
-#define MAX_ACC 	20.0     //in m/s² 
+#define MAX_ACC 	10.0     //in m/s² 
 #define MAX_VEL 	2.0     //in m/s 
 
 // =============================================================================
@@ -90,7 +90,7 @@
 #define POW_2_24 		16777216.0  		// 2^24 for calculations
 #define POW_2_41 		2199023255552.0  	// 2^41 for calculations
 #define AMAX_MAX_ACC 	65535     		  	// Maximum AMAX register value
-#define U_STEPS 		256     			//µSteps pro Vollschritt
+#define U_STEPS 		256   			    //µSteps pro Vollschritt 256,128,64,32,16,8,4,2,0 (0=FULLSTEP aktuell nicht eingebaut)
 #define MOTOR_STEPS 	200  				//200 Vollschritte
 
 // =============================================================================
@@ -108,8 +108,6 @@
 #define NEG_DIR 		0            //Linkslauf
 #define RAMPMODE_POS 	1
 #define RAMPMODE_NEG 	2
-
-
 
 // =============================================================================
 // DEBUGGING AND DIAGNOSTICS

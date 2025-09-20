@@ -26,11 +26,13 @@ void initStepper(void);
 //setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus
 void setMode(MotionMode mode);
 //Aktuelle Position des Motors auslesen
-double getPosition(void);
+double getCurrentPosition(void);
+//Zielposition des Motors auslesen
+double getTargetPosition(void);
 //Aktuelle Position des Motors auf einen neuen Wert setzen
 void setPosition(double position);
 //Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
-void goAbsolute(double position, double vel, double acc);
+void goAbsolute(double position);
 //Setzen der Richtung
 void writeDirection(bool direction);
 //Setzen der Geschwindikeit im VMAX Register
@@ -55,6 +57,8 @@ void enableMotor();
 double getSetVelocity();
 //Rückgabe der aktuellen Sollbeschleunigung (nicht Istbeschleunigung)
 double getSetAcceleration();
+//Ausgabe des motion control registers
+void print_motion_ctl_register(void);
 //Ausgabe des driver status registers
 void print_drv_status_register(void);
 
