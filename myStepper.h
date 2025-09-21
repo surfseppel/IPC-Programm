@@ -18,27 +18,39 @@ typedef enum {
 } MotionMode;
 
 // =============================================================================
-// TMC5160 Funktionen
+// TMC5160 Basisfunktionen
 // =============================================================================
-
 //Einstellung des Motortreibers
 void initStepper(void);
 //setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus
 void setMode(MotionMode mode);
-//Aktuelle Position des Motors auslesen
-double getCurrentPosition(void);
-//Zielposition des Motors auslesen
-double getTargetPosition(void);
-//Aktuelle Position des Motors auf einen neuen Wert setzen
-void setPosition(double position);
-//Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
-void goAbsolute(double position);
 //Setzen der Richtung
 void writeDirection(bool direction);
 //Setzen der Geschwindikeit im VMAX Register
 void writeVelocity(double vel);
 //Setzen der Beschleunigung im AMAX Register
 void writeAcceleration(double acceleration);
+// Stoppen des Motors mit max. Beschleunigung
+void quickStop();
+// Motor deaktivieren
+void disableMotor();
+// Motor aktivieren
+void enableMotor();
+// =============================================================================
+// TMC5160 Funktionen für Mode_Position
+// =============================================================================
+//Aktuelle Position des Motors auslesen
+double getCurrentPosition(void);
+//Zielposition des Motors auslesen
+double getTargetPosition(void);
+//Den Motor in der aktuellen Position auf einen Wert in Metern referenzieren. 
+void setReference(double position);
+//Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
+void goAbsolute(double position);
+
+// =============================================================================
+// TMC5160 Funktionen zur Regelung des Pendels
+// =============================================================================
 //Rückgabe der Geschwindigkeit in m/s
 double getActualVelocity();
 // Geschwindigkeit setzen mit max. Beschleunigung und pos. und neg. Richtung
@@ -47,24 +59,20 @@ void setVelocity(double vel);
 void setAcceleration(double acc);
 // Geschwindigkeit und Beschleunigung setzen und Richtungskontrolle
 void setVelocityAcceleration(double vel, double acc);
-// Stoppen des Motors mit max. Beschleunigung
-void quickStop();
-// Motor deaktivieren
-void disableMotor();
-// Motor aktivieren
-void enableMotor();
 //Rückgabe der aktuellen Sollgeschwindigkeit (nicht Istgeschwindigkeit)
 double getSetVelocity();
 //Rückgabe der aktuellen Sollbeschleunigung (nicht Istbeschleunigung)
 double getSetAcceleration();
+// =============================================================================
+// TMC5160 Debug Funktionen
+// =============================================================================
 //Ausgabe des motion control registers
 void print_motion_ctl_register(void);
 //Ausgabe des driver status registers
 void print_drv_status_register(void);
-
-//----------------------
-//noch nicht geschrieben
-//----------------------
+// =============================================================================
+// TMC5160 Nicht implementierte Funktionen
+// =============================================================================
 //StallGuard Konfiguration
 void initStallGuard(void);
 //Referenzfahrt: Testen der Endlagen und Ausrichten des Wagens

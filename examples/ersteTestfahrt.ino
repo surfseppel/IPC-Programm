@@ -1,17 +1,6 @@
 #include "myGlobals.h"
 #include "myStepper.h"
 
-//toDo:
-/*
-- Taktfrequenz noch mal für den TMC5160 einstellen ???
-- Stepper lib testen mit motor Referenzfahrt programmieren
-- Am Ende noch mal nach den ??? schauen
-!!! Anlage aktuell referenziert !!!
-Referenzflag in disableMotor wirder auf 0  ???ref geht verloren????
-
-
-*/
-
 unsigned long startTime = millis();
 unsigned long intervalTime = 0;
 double targetPosition = 0;
@@ -19,12 +8,19 @@ double velocity = 1.0;
 double acceleration = 1.0;
 unsigned long currTime = 0;
 
-
 void setup() {
   Serial.begin(230400);
-  while (!Serial && millis() - startTime < 5000)
-    ;
+  while (!Serial && millis() - startTime < 5000);
   initStepper();
+   
+  Serial.println();
+  Serial.println("======================================");
+  Serial.println("       Test Verdrahtung               ");
+  Serial.println("======================================");
+  delay(5000);  
+  log_drv_status_register(); 
+  delay(10000);
+  
   Serial.println();
   Serial.println("======================================");
   Serial.println("       Test Rampen                    ");
@@ -125,6 +121,9 @@ void setup() {
   Serial.println("======================================");
   delay(5000);
 
+  //Referenzieren der aktuellen Position auf 10m
+  setReference(10.0);
+
   //Setzen Mode Positionierung mit Geschwindigkeit, Beschleunigung und Position
   setMode(MODE_POSITION);
   writeVelocity(2);
@@ -132,7 +131,7 @@ void setup() {
   goAbsolute(0);
 
   //Motor auf die Position zum Programmstart verfahren
-  while (getCurrentPosition() > 0.01) {
+  while (getCurrentPosition() > 0.001) {
     delay(500);
     Serial.printf("Aktuelle Position: %f m | Zielposition: %f m \n", getCurrentPosition(), getTargetPosition());
   }

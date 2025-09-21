@@ -10,8 +10,7 @@ bool motorDirection = true;           //Motorrichtung true=Rechtslauf, false=Lin
 double absVelocitySet = 0;            //Betrag der aktuell gesetzten Geschwindigkeit (muss noch nicht erreicht sein)
 double absAccelerationSet = 0;        //Betrag der aktuell gesetzten Bschleunigung (muss noch nicht erreicht sein)
 uint8_t rampModeSetting = 1;          //1=Rechtslauf, 2=Linkslauf
-uint8_t referenced = 1;               //??? 0 Anlage nicht referenziert/1 Anlage referenziert
-
+bool referenced = false;               //Anlage referenziert
 MotionMode currentMode = MODE_VELOCITY;  // Standard: Geschwindigkeit
 
 //Einstellung des Motortreibers
@@ -29,15 +28,12 @@ void initStepper(void) {
   driver.setSPISpeed(TMC5160_SPI_CLK);
   SPI.begin();
 
-//??? Setzen der Clock für den TMC5160Stepper
-#if defined(ARDUINO_AVR_UNO)
-  digitalWrite(CLOCKPIN, LOW);  //intere Clock aktiviert
-#elif defined(ESP32)
-  digitalWrite(CLOCKPIN, LOW);  //intere Clock aktiviert
-#else
-  analogWriteFrequency(CLOCKPIN, F_CLK);
-  analogWrite(CLOCKPIN, 128);
-#endif
+  //Setzen der Clock für den TMC5160Stepper mit ESP32 oder Arduino
+  digitalWrite(CLOCKPIN, LOW);  //intere Clock (12MHz) aktiviert
+  //???
+  //Setzen der Clock für den TMC5160Stepper mit Teensy 4.1 
+  //analogWriteFrequency(CLOCKPIN, F_CLK);
+  //analogWrite(CLOCKPIN, 128);
   //??? ende
 
   //Reset Treiber
@@ -121,17 +117,17 @@ double getTargetPosition(void) {
   return (float)driver.XTARGET() * PULLEY_CIRCUM / double(CART_COUNT);  // Liest die Zielposition aus dem XTARGET Register
 }
 
-//Aktuelle Position des Motors mit einem bestimmten Wert beschreiben.
-//Der eingegebene Wert wird durch den Skalierungsfaktor geteilt, um den
-//entsprechenden rohen Encoder-Wert zu erhalten
-void setPosition(double position) {
-  //Begrenzung auf +-1000 m
+//Aktuelle Position des Motors mit einem Wert in Metern beschreiben,
+//um den Verfahrweg zu referenzieren.
+void setReference(double position) {
+  //Begrenzung auf +/-1000 m
   if (position > 1000) position = 1000;
   if (position < -1000) position = -1000;
   driver.XACTUAL((int32_t)(position * CART_COUNT / PULLEY_CIRCUM));  // Setzt die aktuelle Position im XACTUAL Register
+  referenced = true;
 }
 
-//Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert
+//Verfahren auf Position in der Anlage. Nur möglich, wenn Anlage referenziert ist
 void goAbsolute(double position) {
   if (motorDisable) {
     if (DEBUG) {
@@ -158,48 +154,6 @@ void goAbsolute(double position) {
   driver.XTARGET((int32_t)(position * CART_COUNT / PULLEY_CIRCUM));  // Zielposition umwandeln in Inkremente
 }
 
-//StallGuard Konfiguration
-void initStallGuard(void) {
-  //stallGuard aktivieren
-  driver.TCOOLTHRS(0xFFFFF);  // Stoppen aktivieren wenn TCOOLTHRS ≥ TSTEP
-  driver.THIGH(0);            // StallGuard immer aktiv
-  driver.sg_stop(1);          //Stoppen des Motors aktieren
-
-  //Parametrierung in der Applikation parametriert werden.
-  //sg_result ausgeben => sollte bei Normalbetrieb <= 100 sein
-  driver.sgt(4);  // StallGuard-Empfindlichkeit (-64..63)
-
-  //Filterung
-  driver.sedn(0b01);  // Anzahl der StallGuard2, 4-Bit Messungen pro Dekrement: 32, 8, 2, 1
-  driver.sfilt(1);    //filter for more precision of the measurement.
-
-  //Zusätzliche Parameter (??? zur Zeit noch nicht genutzt)
-  //driver.semin(5);            // Untere Schwelle 4-Bit, wenn [sg < SEMIN*32] =>               bei 5 also 160 wird der Strom erhöht
-  //driver.semax(2);            // Obere Schwelle, 4-Bit, wenn [sg > (SEMIN + SEMAX + 1)*32] => bei 2 also 256 wird der Strom gesenkt
-  Serial.println("stallGuard initialized");
-}
-
-//Referenzfahrt: Testen der Endlagen und Ausrichten des Wagens auf die Mitte der Schiene
-void referenceIPC(void) {
-  /*
-1. Nach links, bis stallGuard aktiv
-2. Nach rechts fahren bis stallGuard aktiv
-3. In die Mitte der Bahn fahren
-4. Software Endlagen setzen auf -5 cm der Bahn 
-*/
-}
-// automatische Einstellung der StallGuard
-void autoTuneStallGuard(void) {
-  /*
-   1. normale Betriebsstromstärke und Versorgungsspannung verwenden.
-   2. Motor mit niedriger Geschwindigkeit (<10 RPM) betreiben.
-   3. In diesem Bereich ist die Motorlast kaum relevant für SG_RESULT.
-   4. sfilt einschalten.
-   5. SGT von 0 aus schrittweise erhöhen, bis SG_RESULT ansteigt.
-   6. SGT dann leicht verringern, bis SG_RESULT gerade bei 0 bleibt.
-   => Damit ist SGT optimal eingestellt für eine zuverlässige StallGuard-Erkennung.
-   */
-}
 void writeDirection(bool direction) {
   // 1 ist positiv, 0 ist negative Richtung
 
@@ -335,7 +289,7 @@ void quickStop() {
 // Motor deaktivieren
 void disableMotor() {
   digitalWrite(ENABLEPIN, HIGH);  //Motor deaktiviert
-  //referenced = 0,                 //??? Referenz geht verloren?
+  referenced = false,                 //Referenz geht verloren
   motorDisable = true;
   if (DEBUG) { Serial.println("DRV disable"); }
 }
@@ -425,3 +379,47 @@ void log_drv_status_register(void) {
   Serial.print("Driver Enabled (STST): ");
   Serial.println(stst);
 }
+
+//StallGuard Konfiguration
+void initStallGuard(void) {
+  //stallGuard aktivieren
+  driver.TCOOLTHRS(0xFFFFF);  // Stoppen aktivieren wenn TCOOLTHRS ≥ TSTEP
+  driver.THIGH(0);            // StallGuard immer aktiv
+  driver.sg_stop(1);          //Stoppen des Motors aktieren
+
+  //Parametrierung in der Applikation parametriert werden.
+  //sg_result ausgeben => sollte bei Normalbetrieb <= 100 sein
+  driver.sgt(4);  // StallGuard-Empfindlichkeit (-64..63)
+
+  //Filterung
+  driver.sedn(0b01);  // Anzahl der StallGuard2, 4-Bit Messungen pro Dekrement: 32, 8, 2, 1
+  driver.sfilt(1);    //filter for more precision of the measurement.
+
+  //Zusätzliche Parameter (??? zur Zeit noch nicht genutzt)
+  //driver.semin(5);            // Untere Schwelle 4-Bit, wenn [sg < SEMIN*32] =>               bei 5 also 160 wird der Strom erhöht
+  //driver.semax(2);            // Obere Schwelle, 4-Bit, wenn [sg > (SEMIN + SEMAX + 1)*32] => bei 2 also 256 wird der Strom gesenkt
+  Serial.println("stallGuard initialized");
+}
+
+//Referenzfahrt: Testen der Endlagen und Ausrichten des Wagens auf die Mitte der Schiene
+void referenceIPC(void) {
+  /*
+1. Nach links, bis stallGuard aktiv
+2. Nach rechts fahren bis stallGuard aktiv
+3. In die Mitte der Bahn fahren
+4. Software Endlagen setzen auf -5 cm der Bahn 
+*/
+}
+// automatische Einstellung der StallGuard
+void autoTuneStallGuard(void) {
+  /*
+   1. normale Betriebsstromstärke und Versorgungsspannung verwenden.
+   2. Motor mit niedriger Geschwindigkeit (<10 RPM) betreiben.
+   3. In diesem Bereich ist die Motorlast kaum relevant für SG_RESULT.
+   4. sfilt einschalten.
+   5. SGT von 0 aus schrittweise erhöhen, bis SG_RESULT ansteigt.
+   6. SGT dann leicht verringern, bis SG_RESULT gerade bei 0 bleibt.
+   => Damit ist SGT optimal eingestellt für eine zuverlässige StallGuard-Erkennung.
+   */
+}
+
