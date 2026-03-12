@@ -18,7 +18,7 @@ void setup() {
   Serial.println("       Test Verdrahtung               ");
   Serial.println("======================================");
   delay(5000);  
-  log_drv_status_register(); 
+  print_drv_status_register(); 
   delay(10000);
   
   Serial.println();

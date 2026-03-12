@@ -335,7 +335,7 @@ void print_motion_ctl_register(void) {
 }
 
 //Ausgabe des driver status registers
-void log_drv_status_register(void) {
+void print_drv_status_register(void) {
   uint32_t drv_status = driver.DRV_STATUS();
   // Einzelne Felder extrahieren
   uint16_t sg_result = drv_status & 0x03FF;
