@@ -22,9 +22,10 @@ typedef enum {
 // =============================================================================
 //Einstellung des Motortreibers
 void initStepper(void);
-//setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus
+//setzen des Modus Geschwindigkeitsmodus/Positionierungsmodus mit
+//MODE_VELOCITY/MODE_POSITION
 void setMode(MotionMode mode);
-//Setzen der Richtung
+//Setzen der Richtung mit RIGHT/LEFT
 void writeDirection(bool direction);
 //Setzen der Geschwindikeit im VMAX Register
 void writeVelocity(double vel);
