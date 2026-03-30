@@ -66,7 +66,7 @@
 #define LED_GREEN 28   	//HOMED LED
 #define LED_RES 29		//RESERVE LED Ausgang
 
-^//Encoder inputs
+//Encoder inputs
 #define PENDULUM_ENCODER_PIN_A      0       // Input Encoder A pin 
 #define PENDULUM_ENCODER_PIN_B      1       // Input Encoder B pin 
 
@@ -82,7 +82,7 @@
 // =============================================================================
 // MOTION LIMITS
 // =============================================================================
-#define HOME_VELOCIY 0.7     //in m/s
+#define HOME_VELOCITY 0.7     //in m/s
 #define MAX_ACC 	10.0     //in m/s² 
 #define MAX_VEL 	2.0     //in m/s 
 
