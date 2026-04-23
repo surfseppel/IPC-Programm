@@ -40,6 +40,11 @@
 #define RIGHT_SWITCH 33 //Endlage rechts
 #define JOYSTICK 36		//Analogeingang für JOYSTICK
  
+//#output LEDs
+#define LED_RED 14 		//DRV ENABLE LED
+#define LED_BLUE 13     //HOMED LED
+#define LED_GREEN 12   	//RUN LED
+
 //Encoder inputs
 #define PENDULUM_ENCODER_PIN_A      0       // Input Encoder A pin 
 #define PENDULUM_ENCODER_PIN_B      1       // Input Encoder B pin 
@@ -61,9 +66,10 @@
 #define RIGHT_SWITCH 33 //Endlage rechts
 #define JOYSTICK 23		//Analogeingang für JOYSTICK 
 
+//#output LEDs
 #define LED_RED 26 		//DRV ENABLE LED
-#define LED_BLUE 27     //RUN LED
-#define LED_GREEN 28   	//HOMED LED
+#define LED_BLUE 27     //HOMED LED
+#define LED_GREEN 28   	//RUN LED
 #define LED_RES 29		//RESERVE LED Ausgang
 
 //Encoder inputs
